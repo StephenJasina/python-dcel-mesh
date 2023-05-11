@@ -166,7 +166,7 @@ class Mesh:
                 )
             return self._previous
 
-        def twin(self) -> 'Mesh.Halfedge' | None:
+        def twin(self) -> typing.Union['Mesh.Halfedge', None]:
             '''
             Get the halfedge with the same vertices pointing in the
             opposite direction. Returns `None` if the the halfedge does
