@@ -39,13 +39,6 @@ class Mesh:
 
             return self._index
 
-        def coordinates(self) -> typing.Any:
-            '''
-            Return this vertex's coordinates.
-            '''
-
-            return self._mesh._vertex_coordinates[self._index]
-
         def is_on_boundary(self) -> bool:
             '''
             Return whether this vertex is on the boundary of the
@@ -263,18 +256,16 @@ class Mesh:
     class IllegalMeshException(Exception):
         pass
 
-    def __init__(self, vertex_coordinates: typing.List[typing.Any]=[],
-                 faces: typing.List[typing.List[int]]=[]):
+    def __init__(self, n_vertices: int = 0,
+                 faces: typing.List[typing.List[int]] = []):
         '''
-        Create a mesh with a given set of vertices and faces. The
-        vertices should be a list of coordinates; the faces should be a
-        list of triples of vertex indices oriented counterclockwise.
+        Create a mesh with a given number of vertices and a list of
+        faces. The faces should be a list of triples of vertex indices
+        oriented counterclockwise. Each vertex index must be less than
+        the number of vertices.
         '''
-
-        self._vertex_coordinates = []
 
         self._vertices: typing.List[Mesh.Vertex] = []
-        self._halfedges: typing.List[Mesh.Halfedge] = []
         self._faces: typing.List[Mesh.Face] = []
 
         # Keep track of the edges based on their (origin, destination)
@@ -283,18 +274,16 @@ class Mesh:
         self._halfedge_lookup: typing.Dict[typing.Tuple[int, int],
                                            Mesh.Halfedge] = {}
 
-        for coordinates in vertex_coordinates:
-            self.add_vertex(coordinates)
+        for _ in range(n_vertices):
+            self.add_vertex()
 
         for vertex_indices in faces:
             self.add_face(vertex_indices)
 
-    def add_vertex(self, coordinates: typing.Any) -> 'Mesh.Vertex':
+    def add_vertex(self) -> 'Mesh.Vertex':
         '''
-        Add a vertex to this mesh at the given coordinates.
+        Add a vertex to this mesh.
         '''
-
-        self._vertex_coordinates.append(coordinates)
 
         vertex = self.Vertex(self, len(self._vertices), None)
         self._vertices.append(vertex)
@@ -344,8 +333,6 @@ class Mesh:
                     f'Halfedge {key} defined twice'
                 )
             self._halfedge_lookup[key] = halfedge1
-
-            self._halfedges.append(halfedge1)
 
             # Update next and previous
             halfedge1._next = halfedge2
