@@ -20,8 +20,7 @@ class Mesh:
         be on the boundary.
         '''
 
-        def __init__(self, mesh: 'Mesh', index: int,
-                     halfedge: typing.Union['Mesh.Halfedge', None]):
+        def __init__(self, mesh: 'Mesh', index: int):
             '''
             Create a vertex as part of `mesh`. `index` is a unique key,
             and `halfedge` is the clockwise-most incident halfedge if it
@@ -30,7 +29,7 @@ class Mesh:
 
             self._mesh: Mesh = mesh
             self._index: int = index
-            self._halfedge: Mesh.Halfedge | None = halfedge
+            self._halfedge: typing.Optional[Mesh.Halfedge] = None
 
         def index(self) -> int:
             '''
@@ -102,11 +101,7 @@ class Mesh:
           * The incident face
         '''
 
-        def __init__(self, origin: 'Mesh.Vertex',
-                     next_halfedge: typing.Union['Mesh.Halfedge', None],
-                     previous_halfedge: typing.Union['Mesh.Halfedge', None],
-                     twin_halfedge: typing.Union['Mesh.Halfedge', None],
-                     face: typing.Union['Mesh.Face', None]):
+        def __init__(self, origin: 'Mesh.Vertex'):
             '''
             Create a halfedge, using the doubly connected edge list
             structure. Note that the last four arguments are allowed to
@@ -114,10 +109,10 @@ class Mesh:
             '''
 
             self._origin: Mesh.Vertex = origin
-            self._next: Mesh.Halfedge | None = next_halfedge
-            self._previous: Mesh.Halfedge | None = previous_halfedge
-            self._twin: Mesh.Halfedge | None = twin_halfedge
-            self._face: Mesh.Face | None = face
+            self._next: typing.Optional[Mesh.Halfedge] = None
+            self._previous: typing.Optional[Mesh.Halfedge] = None
+            self._twin: typing.Optional[Mesh.Halfedge] = None
+            self._face: typing.Optional[Mesh.Face] = None
 
         def origin(self) -> 'Mesh.Vertex':
             '''
@@ -159,7 +154,7 @@ class Mesh:
                 )
             return self._previous
 
-        def twin(self) -> typing.Union['Mesh.Halfedge', None]:
+        def twin(self) -> typing.Optional['Mesh.Halfedge']:
             '''
             Get the halfedge with the same vertices pointing in the
             opposite direction. Returns `None` if the the halfedge does
@@ -285,7 +280,7 @@ class Mesh:
         Add a vertex to this mesh.
         '''
 
-        vertex = self.Vertex(self, len(self._vertices), None)
+        vertex = self.Vertex(self, len(self._vertices))
         self._vertices.append(vertex)
 
         return vertex
@@ -304,7 +299,7 @@ class Mesh:
                 )
 
         halfedges = [
-            self.Halfedge(self._vertices[vertex_index], None, None, None, None)
+            self.Halfedge(self._vertices[vertex_index])
             for vertex_index in vertex_indices
         ]
         halfedges.append(halfedges[0])
