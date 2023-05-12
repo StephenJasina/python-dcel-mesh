@@ -136,7 +136,8 @@ class Mesh:
 
             if self._next is None:
                 raise Mesh.IllegalMeshException(
-                    f'Halfedge {(self.origin(), self.destination())}'
+                    'Halfedge '
+                    f'{(self.origin().index(), self.destination().index())} '
                     'has no next'
                 )
             return self._next
@@ -149,7 +150,8 @@ class Mesh:
 
             if self._previous is None:
                 raise Mesh.IllegalMeshException(
-                    f'Halfedge {(self.origin(), self.destination())}'
+                    'Halfedge '
+                    f'{(self.origin().index(), self.destination().index())} '
                     'has no previous'
                 )
             return self._previous
@@ -196,7 +198,8 @@ class Mesh:
 
             if self._face is None:
                 raise Mesh.IllegalMeshException(
-                    f'Halfedge {(self.origin(), self.destination())}'
+                    'Halfedge '
+                    f'{(self.origin().index(), self.destination().index())} '
                     'is not incident to any face'
                 )
             return self._face
