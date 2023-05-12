@@ -1,58 +1,58 @@
-'''
-Mesh implementation based loosely on OpenMesh, which is found here:
+"""
+Mesh implementation based loosely on OpenMesh.
+
+The homepages of OpenMesh and its Python bindings can be found here:
     https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh
     https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/openmesh-python
-'''
+"""
 
 import itertools
 import typing
 
+
 class Mesh:
-    '''
-    Class representing a mesh built of vertices and faces.
-    '''
+    """Class representing a mesh built of vertices and faces."""
 
     class Vertex:
-        '''
-        Class representing a single vertex in a mesh. The vertex has a
-        pointer to some halfedge incident to it. For efficiency, if the
-        vertex is on the boundary, the halfedge it points to will also
-        be on the boundary.
-        '''
+        """
+        Class representing a single vertex in a mesh.
+
+        The vertex has a pointer to some halfedge incident to it. For
+        efficiency, if the vertex is on the boundary, the halfedge it
+        points to will also be on the boundary.
+        """
 
         def __init__(self, mesh: 'Mesh', index: int):
-            '''
-            Create a vertex as part of `mesh`. `index` is a unique key,
-            and `halfedge` is the clockwise-most incident halfedge if it
-            exists (ties broken arbitrarily).
-            '''
+            """
+            Create a vertex as part of `mesh`.
 
+            `index` is a unique key, and `halfedge` is the
+            clockwise-most incident halfedge if it exists (ties broken
+            arbitrarily).
+            """
             self._mesh: Mesh = mesh
             self._index: int = index
             self._halfedge: typing.Optional[Mesh.Halfedge] = None
 
         def index(self) -> int:
-            '''
-            Return this vertex's key.
-            '''
-
+            """Return this vertex's key."""
             return self._index
 
         def is_on_boundary(self) -> bool:
-            '''
-            Return whether this vertex is on the boundary of the
-            mesh. By convention, if the vertex has no incident faces, it
-            is considered to be on the boundary.
-            '''
+            """
+            Return whether this vertex is on the boundary of the mesh.
 
+            By convention, if the vertex has no incident faces, it is
+            considered to be on the boundary.
+            """
             return self._halfedge is None or self._halfedge.is_on_boundary()
 
         def halfedges_out(self) -> typing.Iterator['Mesh.Halfedge']:
-            '''
-            Circulate over the outgoing halfedges of this vertex, going
-            counterclockwise.
-            '''
+            """
+            Circulate over the outgoing halfedges of this vertex.
 
+            By convention, circulation is counterclockwise.
+            """
             halfedge = self._halfedge
             while halfedge is not None:
                 yield halfedge
@@ -61,36 +61,37 @@ class Mesh:
                     break
 
         def halfedges_in(self) -> typing.Iterator['Mesh.Halfedge']:
-            '''
-            Circulate over the ingoing halfedges of this vertex, going
-            counterclockwise.
-            '''
+            """
+            Circulate over the ingoing halfedges of this vertex.
 
+            By convention, circulation is counterclockwise.
+            """
             for halfedge in self.halfedges_out():
                 yield halfedge.previous()
 
         def vertices(self) -> typing.Iterator['Mesh.Vertex']:
-            '''
-            Circulate over the vertices adjacent to this vertex, going
-            counterclockwise.
-            '''
+            """
+            Circulate over the vertices adjacent to this vertex.
 
+            By convention, circulation is counterclockwise.
+            """
             for halfedge in self.halfedges_out():
                 yield halfedge.destination()
 
         def faces(self) -> typing.Iterator['Mesh.Face']:
-            '''
-            Circulate over the incident faces of this vertex, going
-            counterclockwise.
-            '''
+            """
+            Circulate over the incident faces of this vertex.
 
+            By convention, circulation is counterclockwise.
+            """
             for halfedge in self.halfedges_out():
                 yield halfedge.face()
 
     class Halfedge:
-        '''
-        Class representing a halfedge in a mesh. The halfedge has
-        pointers to
+        """
+        Class representing a halfedge in a mesh.
+
+        The halfedge has pointers to
           * Its origin vertex
           * The next halfedge going counterclockwise around its incident
             face
@@ -99,15 +100,14 @@ class Mesh:
           * The twin halfedge with the same vertices but opposite
             direction
           * The incident face
-        '''
+        """
 
         def __init__(self, origin: 'Mesh.Vertex'):
-            '''
-            Create a halfedge, using the doubly connected edge list
-            structure. Note that the last four arguments are allowed to
-            be `None` so that they can be instantiated later.
-            '''
+            """
+            Create a halfedge.
 
+            `origin` is the vertex this halfedge points out of.
+            """
             self._origin: Mesh.Vertex = origin
             self._next: typing.Optional[Mesh.Halfedge] = None
             self._previous: typing.Optional[Mesh.Halfedge] = None
@@ -115,25 +115,19 @@ class Mesh:
             self._face: typing.Optional[Mesh.Face] = None
 
         def origin(self) -> 'Mesh.Vertex':
-            '''
-            Get the origin of this halfedge.
-            '''
-
+            """Get the origin of this halfedge."""
             return self._origin
 
         def destination(self) -> 'Mesh.Vertex':
-            '''
-            Get the destination of this halfedge.
-            '''
-
+            """Get the destination of this halfedge."""
             return self.next().origin()
 
         def next(self) -> 'Mesh.Halfedge':
-            '''
-            Get the next halfedge when traversing the same face going
-            counterclockwise.
-            '''
+            """
+            Get the next halfedge when traversing the same face.
 
+            By convention, traversal is counterclockwise.
+            """
             if self._next is None:
                 raise Mesh.IllegalMeshException(
                     'Halfedge '
@@ -143,11 +137,12 @@ class Mesh:
             return self._next
 
         def previous(self) -> 'Mesh.Halfedge':
-            '''
-            Get the next halfedge when traversing the same face going
-            clockwise.
-            '''
+            """
+            Get the previous halfedge when traversing the same face.
 
+            By convention, traversal is counterclockwise (so the
+            returned halfedge is found by going clockwise).
+            """
             if self._previous is None:
                 raise Mesh.IllegalMeshException(
                     'Halfedge '
@@ -157,45 +152,49 @@ class Mesh:
             return self._previous
 
         def twin(self) -> typing.Optional['Mesh.Halfedge']:
-            '''
-            Get the halfedge with the same vertices pointing in the
-            opposite direction. Returns `None` if the the halfedge does
-            not exist.
-            '''
+            """
+            Get the halfedge pointing in the opposite direction.
 
+            This function returns `None` if the the halfedge does not
+            exist in the mesh. In particular, this happens when the
+            halfedge is on the boundary.
+            """
             return self._twin
 
         def counterclockwise(self) -> typing.Optional['Mesh.Halfedge']:
-            '''
-            Get the next halfedge when traversing the same vertex going
-            counterclockwise.
-            '''
+            """
+            Get the next halfedge from the same origin vertex.
 
+            This function assumes the faces surrounding the origin
+            vertex are connected edge-to-edge. This halfedge is the last
+            one around the vertex, `None` is returned.
+
+            By convention, traversal is counterclockwise.
+            """
             return self.previous().twin()
 
         def clockwise(self) -> typing.Optional['Mesh.Halfedge']:
-            '''
-            Get the next halfedge when traversing the same vertex going
-            clockwise.
-            '''
+            """
+            Get the previous halfedge from the same origin vertex.
 
+            This function assumes the faces surrounding the origin
+            vertex are connected edge-to-edge. This halfedge is the
+            first one around the vertex, `None` is returned.
+
+            By convention, traversal is counterclockwise (so the
+            returned halfedge is found by going clockwise).
+            """
             twin = self.twin()
             if twin is None:
                 return None
             return twin.next()
 
         def is_on_boundary(self) -> bool:
-            '''
-            Get whether this halfedge is on the boundary.
-            '''
-
+            """Get whether this halfedge is on the boundary."""
             return self.twin() is None
 
         def face(self) -> 'Mesh.Face':
-            '''
-            Get the face incident to this halfedge.
-            '''
-
+            """Get the face incident to this halfedge."""
             if self._face is None:
                 raise Mesh.IllegalMeshException(
                     'Halfedge '
@@ -205,24 +204,22 @@ class Mesh:
             return self._face
 
     class Face:
-        '''
-        Class representing a single face in a mesh. The vertex has a
-        pointer to some halfedge incident to it.
-        '''
+        """
+        Class representing a single face in a mesh.
+
+        The face has a pointer to some halfedge incident to it.
+        """
 
         def __init__(self, halfedge: 'Mesh.Halfedge'):
-            '''
-            Create a face incident to `halfedge`.
-            '''
-
+            """Create a face incident to `halfedge`."""
             self._halfedge: Mesh.Halfedge = halfedge
 
         def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
-            '''
-            Circulate counterclockwise over the halfedges incident to
-            this face.
-            '''
+            """
+            Circulate over the halfedges incident to this face.
 
+            By convention, circulation is counterclockwise.
+            """
             halfedge = self._halfedge
             while True:
                 yield halfedge
@@ -231,20 +228,20 @@ class Mesh:
                     break
 
         def vertices(self) -> typing.Iterator['Mesh.Vertex']:
-            '''
-            Circulate over the vetrices incident to this face, going
-            counterclockwise.
-            '''
+            """
+            Circulate over the vertices incident to this face.
 
+            By convention, circulation is counterclockwise.
+            """
             for halfedge in self.halfedges():
                 yield halfedge.origin()
 
         def faces(self) -> typing.Iterator['Mesh.Face']:
-            '''
-            Circulate over the faces adjacent to this face, going
-            counterclockwise.
-            '''
+            """
+            Circulate over the faces adjacent to this face.
 
+            By convention, circulation is counterclockwise.
+            """
             for halfedge in self.halfedges():
                 twin = halfedge.twin()
                 if twin is None:
@@ -252,17 +249,20 @@ class Mesh:
                 yield twin.face()
 
     class IllegalMeshException(Exception):
+        """Class representing errors due to bad mesh construction."""
+
         pass
 
     def __init__(self, n_vertices: int = 0,
                  faces: typing.List[typing.List[int]] = []):
-        '''
-        Create a mesh with a given number of vertices and a list of
-        faces. The faces should be a list of triples of vertex indices
-        oriented counterclockwise. Each vertex index must be less than
-        the number of vertices.
-        '''
+        """
+        Create a mesh.
 
+        The mesh will have the given number of vertices faces determined
+        by `faces`. `faces` should be a list of triples of vertex
+        indices oriented counterclockwise. Each vertex index must be
+        less than `n_vertices`.
+        """
         self._vertices: typing.List[Mesh.Vertex] = []
         self._faces: typing.List[Mesh.Face] = []
 
@@ -279,21 +279,19 @@ class Mesh:
             self.add_face(vertex_indices)
 
     def add_vertex(self) -> 'Mesh.Vertex':
-        '''
-        Add a vertex to this mesh.
-        '''
-
+        """Add a vertex to this mesh, and return it."""
         vertex = self.Vertex(self, len(self._vertices))
         self._vertices.append(vertex)
 
         return vertex
 
     def add_face(self, vertex_indices: typing.List[int]) -> 'Mesh.Face':
-        '''
-        Add an (oriented) face to this mesh defined by the given vertex
-        indices. This function assumes that the vertices already exist.
-        '''
+        """
+        Add an (oriented) face to this mesh, and return it.
 
+        The face is defined by the given vertex indices. This function
+        assumes that the vertices already exist.
+        """
         # Validity checking
         for vertex_index in vertex_indices:
             if vertex_index >= len(self._vertices):
@@ -354,7 +352,7 @@ class Mesh:
             he = halfedge._origin._halfedge
             he_clockwise = he.clockwise()
             while he_clockwise is not None \
-                and he != halfedge:
+                    and he != halfedge:
                 he = he_clockwise
                 he_clockwise = he.clockwise()
             halfedge._origin._halfedge = he
@@ -362,26 +360,17 @@ class Mesh:
         return face
 
     def vertices(self) -> typing.Iterator['Mesh.Vertex']:
-        '''
-        Iterate over the vertices in this mesh.
-        '''
-
+        """Iterate over the vertices in this mesh."""
         for vertex in self._vertices:
             yield vertex
 
     def faces(self) -> typing.Iterator['Mesh.Face']:
-        '''
-        Iterate over the faces in this mesh.
-        '''
-
+        """Iterate over the faces in this mesh."""
         for face in self._faces:
             yield face
 
     def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
-        '''
-        Iterate over the halfedges in this mesh.
-        '''
-
+        """Iterate over the halfedges in this mesh."""
         for face in self.faces():
             for halfedge in face.halfedges():
                 yield halfedge
