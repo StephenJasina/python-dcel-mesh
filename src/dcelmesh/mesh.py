@@ -163,7 +163,7 @@ class Mesh:
 
             return self._twin
 
-        def counterclockwise(self) -> 'Mesh.Halfedge':
+        def counterclockwise(self) -> typing.Optional['Mesh.Halfedge']:
             '''
             Get the next halfedge when traversing the same vertex going
             counterclockwise.
@@ -171,7 +171,7 @@ class Mesh:
 
             return self.previous().twin()
 
-        def clockwise(self) -> 'Mesh.Halfedge':
+        def clockwise(self) -> typing.Optional['Mesh.Halfedge']:
             '''
             Get the next halfedge when traversing the same vertex going
             clockwise.
@@ -246,7 +246,7 @@ class Mesh:
                 twin = halfedge.twin()
                 if twin is None:
                     continue
-                yield halfedge.twin().face()
+                yield twin.face()
 
     class IllegalMeshException(Exception):
         pass

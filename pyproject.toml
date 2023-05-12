@@ -20,3 +20,6 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/StephenJasina/python-dcel-mesh"
 "Bug Tracker" = "https://github.com/StephenJasina/python-dcel-mesh/issues"
+
+[tool.setuptools.package-data]
+"dcelmesh" = ["py.typed"]
