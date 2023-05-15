@@ -34,7 +34,7 @@ class Mesh:
             self._halfedge: typing.Optional[Mesh.Halfedge] = None
 
         def index(self) -> int:
-            """Return this vertex's key."""
+            """Get this vertex's key."""
             return self._index
 
         def is_on_boundary(self) -> bool:
@@ -101,17 +101,23 @@ class Mesh:
           * The incident face
         """
 
-        def __init__(self, origin: 'Mesh.Vertex'):
+        def __init__(self, index: int, origin: 'Mesh.Vertex'):
             """
             Create a halfedge.
 
-            `origin` is the vertex this halfedge points out of.
+            `index` is a unique key, and `origin` is the vertex this
+            halfedge points out of.
             """
+            self._index: int = index
             self._origin: Mesh.Vertex = origin
             self._next: typing.Optional[Mesh.Halfedge] = None
             self._previous: typing.Optional[Mesh.Halfedge] = None
             self._twin: typing.Optional[Mesh.Halfedge] = None
             self._face: typing.Optional[Mesh.Face] = None
+
+        def index(self) -> int:
+            """Get this halfedge's key."""
+            return self._index
 
         def origin(self) -> 'Mesh.Vertex':
             """Get the origin of this halfedge."""
@@ -209,9 +215,19 @@ class Mesh:
         The face has a pointer to some halfedge incident to it.
         """
 
-        def __init__(self, halfedge: 'Mesh.Halfedge'):
-            """Create a face incident to `halfedge`."""
+        def __init__(self, index: int, halfedge: 'Mesh.Halfedge'):
+            """
+            Create a face.
+
+            `index` is a unique key, and `halfedge` is any halfedge
+            incident to this face.
+            """
+            self._index: int = index
             self._halfedge: Mesh.Halfedge = halfedge
+
+        def index(self) -> int:
+            """Get this face's key."""
+            return self._index
 
         def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
             """
@@ -263,6 +279,7 @@ class Mesh:
         less than `n_vertices`.
         """
         self._vertices: typing.List[Mesh.Vertex] = []
+        self._halfedges: typing.List[Mesh.Halfedge] = []
         self._faces: typing.List[Mesh.Face] = []
 
         # Keep track of the edges based on their (origin, destination)
@@ -279,7 +296,7 @@ class Mesh:
 
     def add_vertex(self) -> 'Mesh.Vertex':
         """Add a vertex to this mesh, and return it."""
-        vertex = self.Vertex(self, len(self._vertices))
+        vertex = self.Vertex(len(self._vertices))
         self._vertices.append(vertex)
 
         return vertex
@@ -302,13 +319,15 @@ class Mesh:
                     f'Vertex {vertex_index} does not exist'
                 )
 
-        halfedges = [
-            self.Halfedge(self._vertices[vertex_index])
-            for vertex_index in vertex_indices
-        ]
+        halfedges: typing.List[Mesh.Halfedge] = []
+        for vertex_index in vertex_indices:
+            halfedge = self.Halfedge(len(self._halfedges),
+                                     self._vertices[vertex_index])
+            self._halfedges.append(halfedge)
+            halfedges.append(halfedge)
         halfedges.append(halfedges[0])
 
-        face = self.Face(halfedges[0])
+        face = self.Face(len(self._faces), halfedges[0])
         self._faces.append(face)
 
         # More validity checking
@@ -371,6 +390,15 @@ class Mesh:
         """Get the number of vertices in this mesh."""
         return len(self._vertices)
 
+    def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
+        """Iterate over the halfedges in this mesh."""
+        for halfedge in self._halfedges:
+            yield halfedge
+
+    def n_halfedges(self) -> int:
+        """Get the number of halfedges in this mesh."""
+        return len(self._halfedges)
+
     def faces(self) -> typing.Iterator['Mesh.Face']:
         """Iterate over the faces in this mesh."""
         for face in self._faces:
@@ -379,9 +407,3 @@ class Mesh:
     def n_faces(self) -> int:
         """Get the number of faces in this mesh."""
         return len(self._faces)
-
-    def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
-        """Iterate over the halfedges in this mesh."""
-        for face in self.faces():
-            for halfedge in face.halfedges():
-                yield halfedge
