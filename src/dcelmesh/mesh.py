@@ -22,15 +22,14 @@ class Mesh:
         points to will also be on the boundary.
         """
 
-        def __init__(self, mesh: 'Mesh', index: int):
+        def __init__(self, index: int):
             """
-            Create a vertex as part of `mesh`.
+            Create a vertex.
 
             `index` is a unique key, and `halfedge` is the
             clockwise-most incident halfedge if it exists (ties broken
             arbitrarily).
             """
-            self._mesh: Mesh = mesh
             self._index: int = index
             self._halfedge: typing.Optional[Mesh.Halfedge] = None
 
