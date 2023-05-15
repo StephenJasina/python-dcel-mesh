@@ -368,10 +368,18 @@ class Mesh:
         for vertex in self._vertices:
             yield vertex
 
+    def n_vertices(self) -> int:
+        """Get the number of vertices in this mesh."""
+        return len(self._vertices)
+
     def faces(self) -> typing.Iterator['Mesh.Face']:
         """Iterate over the faces in this mesh."""
         for face in self._faces:
             yield face
+
+    def n_faces(self) -> int:
+        """Get the number of faces in this mesh."""
+        return len(self._faces)
 
     def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
         """Iterate over the halfedges in this mesh."""
