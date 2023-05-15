@@ -285,6 +285,10 @@ class Mesh:
 
         return vertex
 
+    def get_vertex(self, index: int) -> 'Mesh.Vertex':
+        """Return the vertex with the given index."""
+        return self._vertices[index]
+
     def add_face(self, vertex_indices: typing.List[int]) -> 'Mesh.Face':
         """
         Add an (oriented) face to this mesh, and return it.
