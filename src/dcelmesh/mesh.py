@@ -76,6 +76,8 @@ class Mesh:
             """
             for halfedge in self.halfedges_out():
                 yield halfedge.destination()
+            if self.is_on_boundary():
+                yield halfedge.previous().origin()
 
         def edges(self) -> typing.Iterator['Mesh.Edge']:
             """
@@ -85,6 +87,8 @@ class Mesh:
             """
             for halfedge in self.halfedges_out():
                 yield halfedge.edge()
+            if self.is_on_boundary():
+                yield halfedge.previous().edge()
 
         def faces(self) -> typing.Iterator['Mesh.Face']:
             """
