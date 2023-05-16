@@ -77,6 +77,15 @@ class Mesh:
             for halfedge in self.halfedges_out():
                 yield halfedge.destination()
 
+        def edges(self) -> typing.Iterator['Mesh.Edge']:
+            """
+            Circulate over the edges incident to this vertex.
+
+            By convention, circulation is counterclockwise.
+            """
+            for halfedge in self.halfedges_out():
+                yield halfedge.edge()
+
         def faces(self) -> typing.Iterator['Mesh.Face']:
             """
             Circulate over the incident faces of this vertex.
@@ -113,6 +122,7 @@ class Mesh:
             self._next: typing.Optional[Mesh.Halfedge] = None
             self._previous: typing.Optional[Mesh.Halfedge] = None
             self._twin: typing.Optional[Mesh.Halfedge] = None
+            self._edge: typing.Optional[Mesh.Edge] = None
             self._face: typing.Optional[Mesh.Face] = None
 
         def index(self) -> int:
@@ -198,6 +208,16 @@ class Mesh:
             """Get whether this halfedge is on the boundary."""
             return self.twin() is None
 
+        def edge(self) -> 'Mesh.Edge':
+            """Get the edge incident to this halfedge."""
+            if self._edge is None:
+                raise Mesh.IllegalMeshException(
+                    'Halfedge '
+                    f'{(self.origin().index(), self.destination().index())} '
+                    'does not correspond to any edge'
+                )
+            return self._edge
+
         def face(self) -> 'Mesh.Face':
             """Get the face incident to this halfedge."""
             if self._face is None:
@@ -208,9 +228,51 @@ class Mesh:
                 )
             return self._face
 
+    class Edge:
+        """
+        Class representing an edge in a mesh.
+
+        The edge has a pointer to one of its corresponding halfedges.
+        """
+
+        def __init__(self, index: int, halfedge: 'Mesh.Halfedge'):
+            """
+            Create an edge.
+
+            `index` is a unique key, and `halfedge` is any halfedge
+            incident to this edge.
+            """
+            self._index: int = index
+            self._halfedge: Mesh.Halfedge = halfedge
+
+        def index(self) -> int:
+            """Get this edge's key."""
+            return self._index
+
+        def is_on_boundary(self) -> bool:
+            """Return whether this edge is on the boundary of the mesh."""
+            return self._halfedge.is_on_boundary()
+
+        def vertices(self) -> typing.Iterator['Mesh.Vertex']:
+            """Iterate over the vertices incident to this edge."""
+            yield self._halfedge.origin()
+            yield self._halfedge.destination()
+
+        def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
+            """Iterate over the halfedges incident to this edge."""
+            yield self._halfedge
+            twin = self._halfedge.twin()
+            if twin is not None:
+                yield twin
+
+        def faces(self) -> typing.Iterator['Mesh.Face']:
+            """Iterate over the faces incident to this edge."""
+            for halfedge in self.halfedges():
+                yield halfedge.face()
+
     class Face:
         """
-        Class representing a single face in a mesh.
+        Class representing a face in a mesh.
 
         The face has a pointer to some halfedge incident to it.
         """
@@ -251,6 +313,15 @@ class Mesh:
             for halfedge in self.halfedges():
                 yield halfedge.origin()
 
+        def edges(self) -> typing.Iterator['Mesh.Edge']:
+            """
+            Circulate over the edges incident to this face.
+
+            By convention, circulation is counterclockwise.
+            """
+            for halfedge in self.halfedges():
+                yield halfedge.edge()
+
         def faces(self) -> typing.Iterator['Mesh.Face']:
             """
             Circulate over the faces adjacent to this face.
@@ -280,6 +351,7 @@ class Mesh:
         """
         self._vertices: typing.List[Mesh.Vertex] = []
         self._halfedges: typing.List[Mesh.Halfedge] = []
+        self._edges: typing.List[Mesh.Edge] = []
         self._faces: typing.List[Mesh.Face] = []
 
         # Keep track of the edges based on their (origin, destination)
@@ -320,15 +392,13 @@ class Mesh:
                 )
 
         halfedges: typing.List[Mesh.Halfedge] = []
-        for vertex_index in vertex_indices:
-            halfedge = self.Halfedge(len(self._halfedges),
+        for i, vertex_index in enumerate(vertex_indices):
+            halfedge = self.Halfedge(i + len(self._halfedges),
                                      self._vertices[vertex_index])
-            self._halfedges.append(halfedge)
             halfedges.append(halfedge)
         halfedges.append(halfedges[0])
 
         face = self.Face(len(self._faces), halfedges[0])
-        self._faces.append(face)
 
         # More validity checking
         for halfedge1, halfedge2 in itertools.pairwise(halfedges):
@@ -344,7 +414,8 @@ class Mesh:
                 )
 
         for halfedge1, halfedge2 in itertools.pairwise(halfedges):
-            # Update halfedge lookup
+            # Update halfedge list and halfedge lookup
+            self._halfedges.append(halfedge1)
             key = (halfedge1.origin().index(), halfedge2.origin().index())
             if key in self._halfedge_lookup:
                 raise self.IllegalMeshException(
@@ -356,16 +427,22 @@ class Mesh:
             halfedge1._next = halfedge2
             halfedge2._previous = halfedge1
 
-            # Update twin
+            # Update twin and edge
             twin_key = (halfedge2.origin().index(), halfedge1.origin().index())
             if twin_key in self._halfedge_lookup:
-                halfedge1._twin = self._halfedge_lookup[twin_key]
-                self._halfedge_lookup[twin_key]._twin = halfedge1
+                twin = self._halfedge_lookup[twin_key]
+                twin._twin = halfedge1
+                halfedge1._twin = twin
+                halfedge1._edge = twin._edge
+            else:
+                edge = Mesh.Edge(len(self._edges), halfedge1)
+                halfedge1._edge = edge
+                self._edges.append(edge)
 
             # Update face
             halfedge1._face = face
 
-        for halfedge in halfedges[1:]:
+        for halfedge in halfedges[:-1]:
             # Update vertex
             if halfedge._origin._halfedge is None:
                 halfedge._origin._halfedge = halfedge
@@ -379,6 +456,7 @@ class Mesh:
                 he_clockwise = he.clockwise()
             halfedge._origin._halfedge = he
 
+        self._faces.append(face)
         return face
 
     def vertices(self) -> typing.Iterator['Mesh.Vertex']:
@@ -398,6 +476,15 @@ class Mesh:
     def n_halfedges(self) -> int:
         """Get the number of halfedges in this mesh."""
         return len(self._halfedges)
+
+    def edges(self) -> typing.Iterator['Mesh.Edge']:
+        """Iterate over the edges in this mesh."""
+        for edge in self._edges:
+            yield edge
+
+    def n_edges(self) -> int:
+        """Get the number of edges in this mesh."""
+        return len(self._edges)
 
     def faces(self) -> typing.Iterator['Mesh.Face']:
         """Iterate over the faces in this mesh."""
