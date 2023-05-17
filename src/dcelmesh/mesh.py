@@ -464,6 +464,10 @@ class Mesh:
         for vertex in self._vertices:
             yield vertex
 
+    def n_vertices(self) -> int:
+        """Get the number of vertices in this mesh."""
+        return len(self._vertices)
+
     def get_vertex(self, index: int) -> 'Mesh.Vertex':
         """
         Return the vertex with the given index.
@@ -477,14 +481,14 @@ class Mesh:
             )
         return self._vertices[index]
 
-    def n_vertices(self) -> int:
-        """Get the number of vertices in this mesh."""
-        return len(self._vertices)
-
     def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
         """Iterate over the halfedges in this mesh."""
         for halfedge in self._halfedges:
             yield halfedge
+
+    def n_halfedges(self) -> int:
+        """Get the number of halfedges in this mesh."""
+        return len(self._halfedges)
 
     def get_halfedge(self, index: int, second: typing.Optional[int] = None) \
             -> 'Mesh.Halfedge':
@@ -510,10 +514,6 @@ class Mesh:
         raise Mesh.IllegalMeshException(
             f'Halfedge ({index}, {second}) does not exist'
         )
-
-    def n_halfedges(self) -> int:
-        """Get the number of halfedges in this mesh."""
-        return len(self._halfedges)
 
     def edges(self) -> typing.Iterator['Mesh.Edge']:
         """Iterate over the edges in this mesh."""
@@ -557,3 +557,16 @@ class Mesh:
     def n_faces(self) -> int:
         """Get the number of faces in this mesh."""
         return len(self._faces)
+
+    def get_face(self, index: int) -> 'Mesh.Face':
+        """
+        Return the face with the given index.
+
+        If the requested face does not exist, raise a
+        `Mesh.IllegalMeshException`.
+        """
+        if index >= len(self._faces):
+            raise Mesh.IllegalMeshException(
+                f'Face {index} does not exist'
+            )
+        return self._faces[index]
