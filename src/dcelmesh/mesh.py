@@ -600,3 +600,64 @@ class Mesh:
 
         self._faces[face.index] = None
         self.n_faces -= 1
+
+    def reindex(self) -> typing.List[int]:
+        """
+        Reindex the indices of the mesh elements so they are contiguous.
+
+        This function is meant to be called after removing faces from
+        the mesh. The idea is that deleting faces and vertices may cause
+        the set of vertex indices to have gaps. This function relabels
+        the vertices so they are 0, 1, 2, ...
+
+        In addition, this function renames halfedges, edges, and faces
+        so that they have contiguous numbering.
+
+        This method returns a mapping from new vertex labels to old
+        vertex labels (in the form of a list).
+        """
+        # Fix vertices
+        self._vertices = [
+            vertex
+            for vertex in self._vertices
+            if vertex is not None
+        ]
+        mapping = [
+            vertex.index
+            for vertex in self._vertices
+        ]
+        for index, vertex in enumerate(self._vertices):
+            vertex.index = index
+
+        # Fix halfedges
+        self._halfedges = [
+            halfedge
+            for halfedge in self._halfedges
+            if halfedge is not None
+        ]
+        for index, halfedge in enumerate(self._halfedges):
+            halfedge.index = index
+        self._halfedge_lookup = {
+            (halfedge.origin.index, halfedge.destination.index): halfedge
+            for halfedge in self._halfedges
+        }
+
+        # Fix edges
+        self._edges = [
+            edge
+            for edge in self._edges
+            if edge is not None
+        ]
+        for index, edge in enumerate(self._edges):
+            edge.index = index
+
+        # Fix faces
+        self._faces = [
+            face
+            for face in self._faces
+            if face is not None
+        ]
+        for index, face in enumerate(self._faces):
+            face.index = index
+
+        return mapping
