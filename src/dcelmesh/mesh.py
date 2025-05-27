@@ -137,12 +137,12 @@ class Mesh:
             """
             self.index: int = index
             self.origin: Mesh.Vertex = origin
-            self.destination: Mesh.Vertex = None              # type: ignore
-            self.next: Mesh.Halfedge = None                   # type: ignore
-            self.previous: Mesh.Halfedge = None               # type: ignore
-            self.twin: typing.Optional[Mesh.Halfedge] = None  # type: ignore
-            self.edge: Mesh.Edge = None                       # type: ignore
-            self.face: Mesh.Face = None                       # type: ignore
+            self.destination: Mesh.Vertex = None  # type: ignore[assignment]
+            self.next: Mesh.Halfedge = None       # type: ignore[assignment]
+            self.previous: Mesh.Halfedge = None   # type: ignore[assignment]
+            self.twin: typing.Optional[Mesh.Halfedge] = None
+            self.edge: Mesh.Edge = None           # type: ignore[assignment]
+            self.face: Mesh.Face = None           # type: ignore[assignment]
 
         def counterclockwise(self) -> typing.Optional['Mesh.Halfedge']:
             """
@@ -279,7 +279,7 @@ class Mesh:
     def __init__(
         self,
         n_vertices: int = 0,
-        faces: typing.Optional[typing.List[typing.List[int]]] = None
+        faces: typing.Optional[typing.Iterable[typing.Iterable[int]]] = None
     ):
         """
         Create a mesh.
@@ -309,7 +309,10 @@ class Mesh:
 
         if faces is not None:
             for vertex_indices in faces:
-                self.add_face(vertex_indices)
+                self.add_face([
+                    self.get_vertex(vertex_index)
+                    for vertex_index in vertex_indices
+                ])
 
     def vertices(self) -> typing.Iterator['Mesh.Vertex']:
         """Iterate over the vertices in this mesh."""
@@ -343,24 +346,19 @@ class Mesh:
 
         return vertex
 
-    def remove_vertex(self, index: int) -> None:
+    def remove_vertex(self, vertex: 'Mesh.Vertex') -> None:
         """
         Remove a vertex from this mesh.
 
         Also remove incident halfedges, edges, and faces.
-
-        If the requested vertex does not exist, raise a
-        `Mesh.IllegalMeshException`.
         """
-        vertex = self.get_vertex(index)
-
         # Remove the faces incident to the vertex. This will
         # automatically also remove the incident halfedges and edges
         while vertex._halfedge is not None:
-            self.remove_face(next(vertex.faces()).index)
+            self.remove_face(next(vertex.faces()))
 
         # Remove the actual vertex
-        self._vertices[index] = None
+        self._vertices[vertex.index] = None
         self.n_vertices -= 1
 
     def halfedges(self) -> typing.Iterator['Mesh.Halfedge']:
@@ -398,6 +396,104 @@ class Mesh:
         raise Mesh.IllegalMeshException(
             f'Halfedge ({index}, {second}) does not exist'
         )
+
+    def add_vertex_into_halfedge(self, halfedge: 'Mesh.Halfedge') \
+            -> 'Mesh.Vertex':
+        """
+        Add a vertex midway through a halfedge and return it.
+
+        To ensure triangle meshes remain triangular, the resulting faces
+        are then triangulated by adding edges spoking out from the added
+        vertex.
+        """
+        edge = halfedge.edge
+        origin_destination_pairs = [
+            (he.origin, he.destination)
+            for face in edge.faces()
+            for he in face.halfedges()
+            if he.edge.index != edge.index
+        ]
+        # Need to first store faces so that we don't modify a container
+        # while we iterate inside it
+        faces = list(edge.faces())
+        for face in faces:
+            self.remove_face(face)
+
+        vertex = self.add_vertex()
+        for origin, destination in origin_destination_pairs:
+            self.add_face([origin, destination, vertex])
+
+        return vertex
+
+    def remove_vertex_out_of_halfedge(
+        self, first: 'Mesh.Halfedge', second: 'Mesh.Halfedge'
+    ) -> 'Mesh.Halfedge':
+        """
+        Join two consecutive halfedges by removing their shared vertex.
+
+        Raise a `Mesh.IllegalMessException` if
+        `first.destination != second.origin`, if one of the halfedges is
+        on the boundary and the other isn't, or if the faces around the
+        vertex is discontiguous.
+        """
+        # Validity checking
+        if first.destination.index != second.origin.index:
+            raise Mesh.IllegalMeshException(
+                f'Halfedges ({first.origin.index}, {first.destination.index})'
+                + f' and ({second.origin.index}, {second.destination.index})'
+                + ' are not consecutive'
+            )
+        if first.is_on_boundary() != second.is_on_boundary():
+            raise Mesh.IllegalMeshException(
+                f'Halfedge ({first.origin.index}, {first.destination.index})'
+                + (' is' if first.is_on_boundary() else ' is not')
+                + ' on the boundary, but halfedge'
+                + f' ({second.origin.index}, {second.destination.index})'
+                + (' is' if second.is_on_boundary() else ' is not')
+            )
+
+        vertex = first.destination
+
+        if first.is_on_boundary():
+            neighbors = list(vertex.vertices())
+
+            if neighbors[-1].index != first.origin.index:
+                raise Mesh.IllegalMeshException(
+                    f'Faces around vertex {vertex.index} are discontiguous'
+                )
+
+            self.remove_vertex(vertex)
+            self.add_face(neighbors)
+        else:
+            neighbors = [second.destination]
+            neighbors_top: typing.List['Mesh.Vertex']
+            neighbors_bottom: typing.List['Mesh.Vertex']
+            current: typing.Optional['Mesh.Halfedge'] = second
+            while True:
+                current = current.counterclockwise()  # type: ignore[union-attr]
+
+                if current is None:
+                    raise Mesh.IllegalMeshException(
+                        f'Faces around vertex {vertex.index} are discontiguous'
+                    )
+
+                neighbors.append(current.destination)
+
+                if current.destination.index == first.origin.index:
+                    neighbors_top = neighbors
+                    neighbors = [current.destination]
+
+                if current.destination.index == second.destination.index:
+                    neighbors_bottom = neighbors
+                    break
+
+            self.remove_vertex(vertex)
+            self.add_face(neighbors_top)
+            self.add_face(neighbors_bottom)
+
+        return self._halfedge_lookup[
+            first.origin.index, second.destination.index
+        ]
 
     def edges(self) -> typing.Iterator['Mesh.Edge']:
         """Iterate over the edges in this mesh."""
@@ -455,7 +551,8 @@ class Mesh:
             )
         return face
 
-    def add_face(self, vertex_indices: typing.List[int]) -> 'Mesh.Face':
+    def add_face(self, vertices: typing.Iterable['Mesh.Vertex']) \
+            -> 'Mesh.Face':
         """
         Add an (oriented) face to this mesh, and return it.
 
@@ -464,35 +561,24 @@ class Mesh:
         """
         # Create the face and its incident halfedges
         halfedges: typing.List[Mesh.Halfedge] = []
-        for i, vertex_index in enumerate(vertex_indices):
-            # Validity checking
-            if vertex_index >= len(self._vertices):
-                raise self.IllegalMeshException(
-                    f'Vertex {vertex_index} does not exist'
-                )
-            vertex = self._vertices[vertex_index]
-            if vertex is None:
-                raise self.IllegalMeshException(
-                    f'Vertex {vertex_index} does not exist'
-                )
-
+        for i, vertex in enumerate(vertices):
             halfedges.append(self.Halfedge(i + len(self._halfedges), vertex))
         face = self.Face(len(self._faces), halfedges[0])
 
         # Validity checking
-        n_sides = len(vertex_indices)
+        n_sides = len(halfedges)
         for halfedge1, halfedge2 in itertools.islice(
             itertools.pairwise(itertools.cycle(halfedges)), n_sides
         ):
             if not halfedge1.origin.is_on_boundary():
-                raise self.IllegalMeshException(
+                raise Mesh.IllegalMeshException(
                     f'Vertex {halfedge1.origin.index} '
                     'cannot have multiple rings of faces'
                 )
 
             key = (halfedge1.origin.index, halfedge2.origin.index)
             if key in self._halfedge_lookup:
-                raise self.IllegalMeshException(
+                raise Mesh.IllegalMeshException(
                     f'Halfedge {key[0]} -> {key[1]} defined twice'
                 )
 
@@ -555,7 +641,7 @@ class Mesh:
         self.n_faces += 1
         return face
 
-    def remove_face(self, index: int) -> None:
+    def remove_face(self, face: 'Mesh.Face') -> None:
         """
         Remove a face with the given index and its incident half edges.
 
@@ -564,11 +650,9 @@ class Mesh:
         If the requested face does not exist, raise a
         `Mesh.IllegalMeshException`.
         """
-        face = self.get_face(index)
-
         for halfedge in face.halfedges():
             # Fix the twin and edge
-            if not halfedge.is_on_boundary():
+            if halfedge.twin is not None:
                 halfedge.twin.twin = None
                 halfedge.edge._halfedge = halfedge.twin
             else:
@@ -601,6 +685,44 @@ class Mesh:
         self._faces[face.index] = None
         self.n_faces -= 1
 
+    def add_vertex_into_face(self, face: 'Mesh.Face') -> 'Mesh.Vertex':
+        """
+        Add a vertex into a face and return it.
+
+        To ensure triangle meshes remain triangular, edges are added
+        from the added vertex to each vertex incident to the face.
+        vertex.
+        """
+        neighbors = list(face.vertices())
+        n_sides = len(neighbors)
+        self.remove_face(face)
+
+        vertex = self.add_vertex()
+        for origin, destination in itertools.islice(
+            itertools.pairwise(itertools.cycle(neighbors)), n_sides
+        ):
+            self.add_face([origin, destination, vertex])
+
+        return vertex
+
+    def remove_vertex_out_of_face(self, vertex: 'Mesh.Vertex') -> 'Mesh.Face':
+        """
+        Remove a vertex and add a new face surrounding where it was.
+
+        Raise a `Mesh.IllegalMeshException` if the vertex is not in the
+        interior.
+
+        This function undoes `Mesh.add_vertex_into_face`.
+        """
+        if vertex.is_on_boundary():
+            raise Mesh.IllegalMeshException(
+                f'Vertex {vertex.index} is on the boundary'
+            )
+
+        neighbors = list(vertex.vertices())
+        self.remove_vertex(vertex)
+        return self.add_face(neighbors)
+
     def reindex(self) -> typing.List[int]:
         """
         Reindex the indices of the mesh elements so they are contiguous.
@@ -623,11 +745,11 @@ class Mesh:
             if vertex is not None
         ]
         mapping = [
-            vertex.index
+            vertex.index  # type: ignore[union-attr]
             for vertex in self._vertices
         ]
         for index, vertex in enumerate(self._vertices):
-            vertex.index = index
+            vertex.index = index  # type: ignore[union-attr]
 
         # Fix halfedges
         self._halfedges = [
@@ -636,9 +758,9 @@ class Mesh:
             if halfedge is not None
         ]
         for index, halfedge in enumerate(self._halfedges):
-            halfedge.index = index
+            halfedge.index = index  # type: ignore[union-attr]
         self._halfedge_lookup = {
-            (halfedge.origin.index, halfedge.destination.index): halfedge
+            (halfedge.origin.index, halfedge.destination.index): halfedge  # type: ignore[union-attr,misc]
             for halfedge in self._halfedges
         }
 
@@ -649,7 +771,7 @@ class Mesh:
             if edge is not None
         ]
         for index, edge in enumerate(self._edges):
-            edge.index = index
+            edge.index = index  # type: ignore[union-attr]
 
         # Fix faces
         self._faces = [
@@ -658,6 +780,6 @@ class Mesh:
             if face is not None
         ]
         for index, face in enumerate(self._faces):
-            face.index = index
+            face.index = index  # type: ignore[union-attr]
 
         return mapping
