@@ -406,24 +406,7 @@ class Mesh:
         are then triangulated by adding edges spoking out from the added
         vertex.
         """
-        edge = halfedge.edge
-        origin_destination_pairs = [
-            (he.origin, he.destination)
-            for face in edge.faces()
-            for he in face.halfedges()
-            if he.edge.index != edge.index
-        ]
-        # Need to first store faces so that we don't modify a container
-        # while we iterate inside it
-        faces = list(edge.faces())
-        for face in faces:
-            self.remove_face(face)
-
-        vertex = self.add_vertex()
-        for origin, destination in origin_destination_pairs:
-            self.add_face([origin, destination, vertex])
-
-        return vertex
+        return self.add_vertex_into_edge(halfedge.edge)
 
     def remove_vertex_out_of_halfedge(
         self, first: 'Mesh.Halfedge', second: 'Mesh.Halfedge'
@@ -530,6 +513,32 @@ class Mesh:
         raise Mesh.IllegalMeshException(
             f'Edge {{{index}, {second}}} does not exist'
         )
+
+    def add_vertex_into_edge(self, edge: 'Mesh.Edge') -> 'Mesh.Vertex':
+        """
+        Add a vertex midway through an edge and return it.
+
+        To ensure triangle meshes remain triangular, the resulting faces
+        are then triangulated by adding edges spoking out from the added
+        vertex.
+        """
+        origin_destination_pairs = [
+            (he.origin, he.destination)
+            for face in edge.faces()
+            for he in face.halfedges()
+            if he.edge.index != edge.index
+        ]
+        # Need to first store faces so that we don't modify a container
+        # while we iterate inside it
+        faces = list(edge.faces())
+        for face in faces:
+            self.remove_face(face)
+
+        vertex = self.add_vertex()
+        for origin, destination in origin_destination_pairs:
+            self.add_face([origin, destination, vertex])
+
+        return vertex
 
     def faces(self) -> typing.Iterator['Mesh.Face']:
         """Iterate over the faces in this mesh."""
