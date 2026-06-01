@@ -43,6 +43,12 @@ class Mesh:
             """
             return self._halfedge is None or self._halfedge.is_on_boundary()
 
+        def is_isolated(self) -> bool:
+            """
+            Return whether this vertex has any incident faces.
+            """
+            return self._halfedge is None
+
         def halfedges_out(self) -> typing.Iterator['Mesh.Halfedge']:
             """
             Circulate over the outgoing halfedges of this vertex.
